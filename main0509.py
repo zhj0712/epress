@@ -77,12 +77,24 @@ class SerialThread(QThread):
         except:
             # QMessageBox.about(self, "Port Error", "此串口不能被打开！")
             return None
+
     # 关闭串口
     def port_close(self):
         try:
             self.ser.close()
         except:
             pass
+
+    # 写入 1
+    def data_write_1(self):
+        data = self.command_Data('%01#WDD00360003600100')
+        self.data_send(data)
+
+    # 写入 0
+    def data_write_0(self):
+        data = self.command_Data('%01#WDD00360003600000')
+        self.data_send(data)
+
     # 将松下指令加上BCC校验位，并转成16进制
     def command_Data(self, Command):
         lit = []
@@ -98,30 +110,82 @@ class SerialThread(QThread):
             else:
                 BCC = lit[i] ^ 0
         Command = Command + hex(BCC)[2:]  # 在指令中加入BCC校验码
+
         # 将松下指令转成16进制
         for i in range(len(Command)):
             Command_hex = Command_hex + hex(ord(Command[i]))[2:] + " "
         Command_hex = Command_hex + '0d'  # 加入松下指令的终止位CR
         # 返回将松下完整指令转成16进制数据
+        # print(Command_hex)
         return Command_hex
 
     def data_send(self, send_data):
         if self.ser.isOpen():
-            if send_data != "":  # 非空字符串
+            if send_data != "":
+                # 非空字符串
+                # if self.hex_send.isChecked():
                 # hex发送
                 send_data = send_data.strip()
                 send_list = []
                 while send_data != '':
-                    num = int(send_data[0:2], 16)
+                    try:
+                        num = int(send_data[0:2], 16)
+                    except ValueError:
+                        QMessageBox.critical(self, 'wrong data', '请输入十六进制数据，以空格分开!')
+                        return None
                     send_data = send_data[2:].strip()
                     send_list.append(num)
                 send_data = bytes(send_list)
+                # else:
+                #     # ascii发送
+                #     send_data = (send_data + '\r\n').encode('utf-8')
+                # 发送数据
                 self.ser.write(send_data)
+                # print(num)
         else:
             pass
+
+        # 接收数据
+
+    # 调试用 处理falg 数据
+    def one_falg_data(self, data):
+        # read_data = data.decode('utf-8')
+        # print(read_data)
+        # 去掉前面无用响应码
+        u8_data = data[6:]
+        # 切取有效数据
+        u8_data = u8_data[:4]
+        # 将数据前后两位反序 得到正确数据
+        H_Data = u8_data[:2]
+        L_Data = u8_data[2:]
+        data = L_Data + H_Data
+        try:
+            data = int(data, 16)
+            # print(data)
+        except Exception as e:
+            print("错误def_one_data:" + str(e))
+        return data
+
+    # 处理falg数据
+    def falg_data(self, data):
+        # read_data = data.decode('utf-8')
+        # print(read_data)
+        # 去掉前面无用响应码
+        u8_data = data[6:]
+        # 切取有效数据
+        u8_data = u8_data[:1]
+        # 将数据前后两位反序 得到正确数据
+        data = u8_data
+        try:
+            data = int(data, 16)
+        except Exception as e:
+            print("错误def_one_data:" + str(e))
+        return data
+
     # 处理单个数据  最大压力等
     def one_data(self, data):
         read_data = str(data, encoding="utf-8")
+        # print(read_data)
         if read_data != '':
             # print(read_data)
             # 去掉前面无用响应码
@@ -142,6 +206,7 @@ class SerialThread(QThread):
                 data = int(data, 16)
             except Exception as e:
                 print("错误one_data:" + str(e))
+            # print(data)
             return data
 
     # 处理多个数据  压力和位置采样
@@ -158,12 +223,16 @@ class SerialThread(QThread):
                 L_Data = data[2:]
                 data = L_Data + H_Data
                 # 将位置数据转换为10进制 单位为mm
-                if data == 0x00:break
+                if data == 0x00:
+                    break
                 try:
                     data = int(data, 16)
-                    if data == 0:break
+                    # print(data)
+                    if data == 0:
+                        break
                 except Exception as e:
                     print("错误many_data:" + str(e))
+
                 data_list.append(data)
                 PLC_Data = PLC_Data[4:]
         else:
@@ -193,6 +262,7 @@ class SerialThread(QThread):
                 data1 = data.decode('utf-8')
                 data2 = data1[6:-3]
                 data2 = int(data2)
+                # data2 = self.one_falg_data(data1)
                 # 当应答 为 1 时  读取压装数据
                 if data2 == 0:
                     # self.auto_send.setChecked(0)
@@ -591,6 +661,9 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
                 except pymysql.Error as e:
                     # 错误信息
                     print("错误def_select_find:" + str(e))
+
+
+
             else:
                 pass
 
@@ -721,6 +794,9 @@ class curve_ui(QMainWindow, Ui_Form):
             result = self.find_mysql(sql)
             x, y = self.str_to_int_list(result[0][0], result[0][1])
             self.pw = self.widget
+            # pw = pg.PlotWidget(name='Plot1')
+            # self.pw = pg.plot()
+            # self.pw.clear()
             # 清除上次的曲线
             self.pw.clear()
             # 设置图表标题、颜色、字体大小

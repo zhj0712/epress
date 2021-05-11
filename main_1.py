@@ -9,35 +9,29 @@
 # ************************************
 import sys
 import time
-import traceback
 
-import PyQt5
-import pyqtgraph as pg
-import pymysql
-import serial
-import serial.tools.list_ports
+import PyQt5 #导入PYQT5
 from PyQt5 import QtWidgets
 from PyQt5.QtGui import QColor, QBrush, QFont, QIcon
 from PyQt5.QtNetwork import QLocalSocket, QLocalServer
 from PyQt5.QtWidgets import QMessageBox, QTableWidgetItem, QHeaderView, QInputDialog, QLineEdit, QApplication, \
     QMainWindow
 from PyQt5.QtCore import QTimer, QDateTime, QThread, pyqtSignal, Qt, QDate, QBasicTimer
-from view.pressDataView import Ui_MainWindow
-from view.changePWD import Ui_Form_PWD
-from view.about import Ui_Form_About
-from view.pressCurve import Ui_Form
-from kneed import KneeLocator
-from view.serialPort import Ui_Form_SerialPort
 
-# 数据库参数
-from view.ui_Splash import Ui_Form_load
+import pyqtgraph as pg # 导入曲线库
+import serial   # 导入串口
+import serial.tools.list_ports
 
-DB_HOST = 'localhost'
-DB_POST = '3306'
-DB_USER = 'root'
-DB_PASSWORD = '123231'
-DB_NAME = 'press'
+from view.pressDataView import Ui_MainWindow # 导入程序主界面
+from view.changePWD import Ui_Form_PWD # 导入更改密码界面
+from view.about import Ui_Form_About # 导入关于界面
+from view.pressCurve import Ui_Form # 导入曲线显示界面
+from kneed import KneeLocator  # 导入拐点算法
+from view.serialPort import Ui_Form_SerialPort  #导入串口设置界面
 
+from database.mysql import mysql # 导入数据库操作
+
+from view.ui_Splash import Ui_Form_load  #导入程序加载界面
 
 # 数据更新到主界面线程
 class SerialThread(QThread):
@@ -47,6 +41,8 @@ class SerialThread(QThread):
 
     def __init__(self, parent=None):
         super(SerialThread, self).__init__(parent)
+        self.mysql = mysql()
+        self.mysql.open_mysql()
         self.port = serial_port()
         self.ser = serial.Serial()
         self.port_check()
@@ -58,7 +54,7 @@ class SerialThread(QThread):
         self.port_list = list(serial.tools.list_ports.comports())
         self.port.port_select.clear()
         for port in self.port_list:
-            self.Com_Dict["%s" % port[0]] = "%s" % port[1]
+            self.Com_Dict[f"{port[0]}"] = f"%{port[1]}"
             self.port.port_select.addItem(port[0])
     # 打开串口
     def port_open(self):
@@ -78,24 +74,16 @@ class SerialThread(QThread):
         except:
             # QMessageBox.about(self, "Port Error", "此串口不能被打开！")
             return None
-
     # 关闭串口
     def port_close(self):
         try:
             self.ser.close()
         except:
             pass
-
-    # DT78写入1
-    def DT78_write_1(self):
-        data = self.command_Data('%01#WDD00078000780100')
+    # DT78写入1 '%01#WDD00078000780100'  DT472写入0 '%01#WDD00472004720000'
+    def DT78_write(self,command):
+        data = self.command_Data(command)
         self.data_send(data)
-
-    # DT472写入 0
-    def DT472_write_0(self):
-        data = self.command_Data('%01#WDD00472004720000')
-        self.data_send(data)
-
     # 将松下指令加上BCC校验位，并转成16进制
     def command_Data(self, Command):
         lit = []
@@ -111,83 +99,47 @@ class SerialThread(QThread):
             else:
                 BCC = lit[i] ^ 0
         Command = Command + hex(BCC)[2:]  # 在指令中加入BCC校验码
-
         # 将松下指令转成16进制
         for i in range(len(Command)):
             Command_hex = Command_hex + hex(ord(Command[i]))[2:] + " "
         Command_hex = Command_hex + '0d'  # 加入松下指令的终止位CR
         # 返回将松下完整指令转成16进制数据
-        # print(Command_hex)
         return Command_hex
     # 串口发送数据
     def data_send(self, send_data):
         if self.ser.isOpen():
-            if send_data != "":
-                # 非空字符串
-                # if self.hex_send.isChecked():
+            if send_data != "":# 非空字符串
                 # hex发送
                 send_data = send_data.strip()
                 send_list = []
                 while send_data != '':
-                    try:
-                        num = int(send_data[0:2], 16)
-                    except ValueError:
-                        QMessageBox.critical(self, 'wrong data', '请输入十六进制数据，以空格分开!')
-                        return None
+                    num = int(send_data[0:2], 16)
                     send_data = send_data[2:].strip()
                     send_list.append(num)
                 send_data = bytes(send_list)
                 self.ser.write(send_data)
-                # print(num)
         else:
             pass
-
-        # 接收数据
-
-    # 调试用 处理falg 数据
-    def one_falg_data(self, data):
-        # read_data = data.decode('utf-8')
-        # print(read_data)
-        # 去掉前面无用响应码
-        u8_data = data[6:]
-        # 切取有效数据
-        u8_data = u8_data[:4]
-        # 将数据前后两位反序 得到正确数据
-        H_Data = u8_data[:2]
-        L_Data = u8_data[2:]
-        data = L_Data + H_Data
-        try:
-            data = int(data, 16)
-            # print(data)
-        except Exception as e:
-            print("错误def_one_data:" + str(e))
-        return data
-
     # 处理单个数据  flag 质量状态
     def one_data(self, data):
         read_data = data.decode('utf-8')
         # 去掉前面无用响应码
-        # print(read_data)
-        u8_data = data[6:]
+        u8_data = read_data[6:]
         # 切取有效数据
         u8_data = u8_data[:4]
         # 将数据前后两位反序 得到正确数据
         H_Data = u8_data[:2]
         L_Data = u8_data[2:]
         data = L_Data + H_Data
-        # print(data)
         try:
             data = int(data, 16)
         except Exception as e:
             print("错误def_one_data:" + str(e))
         return data
-
     # 处理两个数据  最大压力等
     def two_data(self, data):
-        read_data = str(data, encoding="utf-8")
-        # print(read_data)
+        read_data = data.decode('utf-8')
         if read_data != '':
-            # print(read_data)
             # 去掉前面无用响应码
             u8_data = read_data[6:]
             # 切取有效数据
@@ -206,13 +158,10 @@ class SerialThread(QThread):
                 data = int(data, 16)
             except Exception as e:
                 print("错误one_data:" + str(e))
-            # print(data)
             return data
-
     # 处理多个数据  压力和位置采样
     def many_data(self, data):
-        # 将数据转为str格式
-        PLC_Data = str(data, encoding="utf-8")
+        PLC_Data = data.decode('utf-8')
         if PLC_Data != None:
             PLC_Data = PLC_Data[6:]
             # 循环切片数据 调换高低位  并写入data_list
@@ -227,12 +176,10 @@ class SerialThread(QThread):
                     break
                 try:
                     data = int(data, 16)
-                    # print(data)
                     if data == 0:
                         break
                 except Exception as e:
                     print("错误many_data:" + str(e))
-
                 data_list.append(data)
                 PLC_Data = PLC_Data[4:]
         else:
@@ -246,13 +193,11 @@ class SerialThread(QThread):
             data = self.command_Data(command)
             self.data_send(data)
             try:
-                # num = self.ser.inWaiting()
                 while 1:
                     time.sleep(0.2)
                     num = self.ser.inWaiting()
                     if num != 0:
                         break
-                # print(num)
             except:
                 self.port_close()
                 return None
@@ -331,7 +276,7 @@ class SerialThread(QThread):
                 self.press_data_list.insert(4, data1)
                 self.data = self.press_data_list
                 # 读完后 DT78写1
-                self.DT78_write_1()
+                self.DT78_write('%01#WDD00078000780100')
         # 当DT472=0时 为出错或报警状态 读取数据
         elif data1 == 0:
             # 发送指令 读取DT78的值,'%01#RDD0007800078'
@@ -345,7 +290,7 @@ class SerialThread(QThread):
                 self.press_data_list = self.press_data_list.append([])
                 self.data = self.press_data_list
                 # # 读完后 DT78写1
-                self.DT78_write_1()
+                self.DT78_write('%01#WDD00078000780100')
 
         # 将数据 写入数据库
         # 0最大压力 1终止压力 2 终止位置 3作业时间 4质量状态 5压力数据采样 6压力数据采样 7位置数据采样 8位置数据采样 9条码 10拐点
@@ -368,48 +313,12 @@ class SerialThread(QThread):
                 barcode, inflection_point, qualified, maxPressure, endPressure, endLocation, workTime,
                 pressureCurveData,
                 locationCurveData, time)
-            self.add_mysql(sql, value)
-        except pymysql.Error as e:
+            self.mysql.add_mysql(sql, value)
+        except Exception as e:
             # 错误信息
-            print("数据库错误def_press_data_receive:" + str(e))
+            print("press_data_receive:" + str(e))
 
-    def open_mysql(self):
-        try:
-            # 连接数据库
-            self.db = pymysql.connect(DB_HOST, DB_USER, DB_PASSWORD, DB_NAME)
-            # 打开数据库
-            self.cur = self.db.cursor()
-        except pymysql.Error as e:
-            print("数据库错误def_open_mysql:" + str(e))
-
-    # 数据库查询数据
-    def find_mysql(self, sql):
-        try:
-            self.open_mysql()
-            self.cur.execute(sql)
-            result = self.cur.fetchall()
-            self.cur.close()
-            return result
-        except pymysql.Error as e:
-            # 错误信息
-            print("错误def_select_find:" + str(e))
-
-    # 数据库增加数据
-    def add_mysql(self, sql, value):
-        try:
-            self.open_mysql()
-            # 执行SQL语句
-            self.cur.execute(sql, value)
-            # 提交数据
-            self.db.commit()
-            # 关闭表格
-            self.cur.close()
-            # 关闭数据库
-            self.db.close()
-        except pymysql.Error as e:
-            # 错误信息
-            print("错误def_select_find:" + str(e))
-
+    # 线程run
     def run(self):
         while 1:
             try:
@@ -420,21 +329,10 @@ class SerialThread(QThread):
                 self.port_select.emit(self.port_list)
                 self.press_data_receive()
                 sql = 'SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE to_days(pressdata.timer) = to_days(now()) ;'
-                result = self.find_mysql(sql)
-                self.update_data.emit(result)
-                # 将查询到的数据发送给槽函数
-                # 3秒更新一次数据
-                # time.sleep(3)
-            except:
-                a, b, c = sys.exc_info()
-                print(a)
-                print(b)
-                print(c)
-                print('-----------')
-                for i in traceback.extract_tb(c):
-                    print(i)
-
-
+                result = self.mysql.find_mysql(sql)
+                self.update_data.emit(result) # 将查询到的数据发送给槽函数
+            except Exception as e:
+                print("run" + str(e))
 # 主界面
 class press_Data_App(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -450,10 +348,9 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
         self.about_us = about_us()
         # 实例化曲线窗口
         self.curve_ui = curve_ui()
-        # ***调试用 PLC 写入判断位 1
-        # self.data_write_1()
-        # 默认开启数据接收
-        # self.start_data()
+        # 实例化数据库
+        self.mysql = mysql()
+        self.mysql.open_mysql()
 
     def init(self):
         # 查询按钮
@@ -561,75 +458,25 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
         self.about_us.show()
 
     # **************************数据库**********************************
-    # 打开数据库
-    def open_mysql(self):
-        try:
-            # 连接数据库
-            self.db = pymysql.connect(DB_HOST, DB_USER, DB_PASSWORD, DB_NAME)
-            # 打开数据库
-            self.cur = self.db.cursor()
-        except pymysql.Error as e:
-            print("数据库错误def_open_mysql:" + str(e))
-
-    # 数据库删除数据
-    def delete_mysql(self, sql):
-        try:
-            self.open_mysql()
-            self.cur.execute(sql)
-            self.db.commit()  # 提交请求
-            self.cur.close()
-            # return result
-        except pymysql.Error as e:
-            # 错误信息
-            print("错误def_select_find:" + str(e))
-
-    # 数据库查询数据
-    def find_mysql(self, sql):
-        try:
-            self.open_mysql()
-            self.cur.execute(sql)
-            result = self.cur.fetchall()
-            self.cur.close()
-            return result
-        except pymysql.Error as e:
-            # 错误信息
-            print("错误def_select_find:" + str(e))
-
-    # 数据库增加数据
-    def add_mysql(self, sql, value):
-        try:
-            self.open_mysql()
-            # 执行SQL语句
-            self.cur.execute(sql, value)
-            # 提交数据
-            self.db.commit()
-            # 关闭表格
-            self.cur.close()
-            # 关闭数据库
-            self.db.close()
-        except pymysql.Error as e:
-            # 错误信息
-            print("错误def_select_find:" + str(e))
-
     # 按选择 或 条件 查询数据 并显示在tableWidget_2上
     def find_data(self):
         if self.select_rbtn.isChecked():
             if self.select_date.currentText() == "本月":
                 sql = "SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE MONTH(timer)=MONTH(NOW());"
-                data = self.find_mysql(sql)
+                data = self.mysql.find_mysql(sql)
                 self.show_data_tableWidget_2(data)
             if self.select_date.currentText() == "上月":
                 sql = "SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE  PERIOD_DIFF( date_format( now( ) , '%Y%m' ) , date_format( timer, '%Y%m' ) ) =1;"
-                data = self.find_mysql(sql)
+                data = self.mysql.find_mysql(sql)
                 self.show_data_tableWidget_2(data)
             elif self.select_date.currentText() == "近半年":
                 sql = 'SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE timer BETWEEN date_sub(now(),INTERVAL 6 MONTH ) AND now();'
                 # sql = 'SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE QUARTER(timer)=QUARTER(DATE_SUB(now(),interval 1 QUARTER)) AND YEAR(timer)=YEAR(NOW();'
-                data = self.find_mysql(sql)
+                data = self.mysql.find_mysql(sql)
                 self.show_data_tableWidget_2(data)
             elif self.select_date.currentText() == "本年":
                 sql = 'SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE YEAR(timer)=YEAR(NOW());'
-                data = self.find_mysql(sql)
+                data = self.mysql.find_mysql(sql)
                 self.show_data_tableWidget_2(data)
             else:
                 pass
@@ -637,46 +484,45 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
             start_date = self.start_date.text()
             end_date = self.end_date.text()
             sql = "SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE timer >= STR_TO_DATE(" + "'" + start_date + "'," + "'%Y-%m-%d %H:%M:%S') AND timer <= STR_TO_DATE(" + "'" + end_date + "'," + "'%Y-%m-%d %H:%M:%S');"
-            data = self.find_mysql(sql)
+            data = self.mysql.find_mysql(sql)
             self.show_data_tableWidget_2(data)
 
     # 按选择 或 条件 删除数据
     def delete_data(self):
         if self.select_delete_rbtn.isChecked():
-            messageBox = QMessageBox()
             warning = QMessageBox.warning(self, '提示', '确定要删除数据吗,删除后数据不可恢复', QMessageBox.Yes | QMessageBox.No,
                                           QMessageBox.No)
             if warning == QMessageBox.Yes:
                 pwd, bb = QInputDialog.getText(self, '密码验证', '请输入管理员密码', echo=QLineEdit.Password)
                 try:
                     sql = "SELECT password FROM userName WHERE name='admin';"
-                    password = self.find_mysql(sql)
+                    password = self.mysql.find_mysql(sql)
                     password = password[0][0]
                     # 跟数据库数据对比
                     if pwd == password and bb:
                         if self.select_delete_date.currentText() == "全部删除":
                             sql = "DELETE FROM pressdata"
-                            self.delete_mysql(sql)
+                            self.mysql.delete_mysql(sql)
                             QMessageBox.about(self, '提示', '数据已删除')
                         elif self.select_delete_date.currentText() == "超过一年":
                             sql = "DELETE FROM pressdata WHERE timer < DATE_SUB(NOW(), INTERVAL 1 YEAR)"
-                            self.delete_mysql(sql)
+                            self.mysql.delete_mysql(sql)
                             QMessageBox.about(self, '提示', '数据已删除')
                         elif self.select_delete_date.currentText() == "超过三年":
                             sql = "DELETE FROM pressdata WHERE timer < DATE_SUB(NOW(), INTERVAL 3 YEAR)"
-                            self.delete_mysql(sql)
+                            self.mysql.delete_mysql(sql)
                             QMessageBox.about(self, '提示', '数据已删除')
                         elif self.select_delete_date.currentText() == "超过五年":
                             sql = "DELETE FROM pressdata WHERE timer < DATE_SUB(NOW(), INTERVAL 5 YEAR)"
-                            self.delete_mysql(sql)
+                            self.mysql.delete_mysql(sql)
                             QMessageBox.about(self, '提示', '数据已删除')
                         else:
                             QMessageBox.about(self, '提示', '删除数据不成功')
                     else:
                         QMessageBox.warning(self, '提示', '密码不正确')
-                except pymysql.Error as e:
+                except Exception as e:
                     # 错误信息
-                    print("错误def_select_find:" + str(e))
+                    print("select_find:" + str(e))
             else:
                 pass
 
@@ -691,21 +537,17 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
                 pwd, bb = QInputDialog.getText(self, '密码验证', '请输入管理员密码', echo=QLineEdit.Password)
                 try:
                     sql = "SELECT password FROM userName WHERE name='admin';"
-                    password = self.find_mysql(sql)
+                    password = self.mysql.find_mysql(sql)
                     password = password[0][0]
                     # 跟数据库数据对比
                     if pwd == password and bb:
                         sql = "DELETE FROM pressdata WHERE timer >= STR_TO_DATE(" + "'" + start_delete_date + "'," + "'%Y-%m-%d %H:%M:%S') AND timer <= STR_TO_DATE(" + "'" + end_delete_date + "'," + "'%Y-%m-%d %H:%M:%S');"
-                        self.delete_mysql(sql)
+                        self.mysql.delete_mysql(sql)
                         QMessageBox.about(self, '提示', '数据已删除')
                     else:
                         QMessageBox.warning(self, '提示', '密码不正确')
-                except pymysql.Error as e:
-                    # 错误信息
+                except Exception as e:
                     print("错误def_select_find:" + str(e))
-
-
-
             else:
                 pass
 
@@ -828,12 +670,13 @@ class curve_ui(QMainWindow, Ui_Form):
         self.setFixedSize(self.width(), self.height())
         # 禁用最小和最大化按钮
         self.setWindowFlags(Qt.WindowCloseButtonHint)
-        # self.init()
+        self.mysql = mysql()
+        self.mysql.open_mysql()
 
     def curev_widget(self, id):
         try:
-            sql = "SELECT locationCurveData,pressureCurveData,timer,inflectionPoint  FROM pressdata WHERE id = %s" % id
-            result = self.find_mysql(sql)
+            sql = f"SELECT locationCurveData,pressureCurveData,timer,inflectionPoint  FROM pressdata WHERE id = {id}"
+            result = self.mysql.find_mysql(sql)
             x, y = self.str_to_int_list(result[0][0], result[0][1])
             self.pw = self.widget
             # 清除上次的曲线
@@ -858,11 +701,11 @@ class curve_ui(QMainWindow, Ui_Form):
             # 计算拐点
             inflection_point = result[0][3]
             # 曲线内显示文本
-            aa = '%s/%s' % (inflection_point[1], inflection_point[0])
+            aa = f'{inflection_point[1]}/{inflection_point[0]}'
             x = float(inflection_point[0])
             y = int(inflection_point[1])
             text = pg.TextItem(
-                html='<div style="text-align: center"><span style="color: #0d1042; font-size: 12pt;">%s</span></div>' % aa,
+                html=f'<div style="text-align: center"><span style="color: #0d1042; font-size: 12pt;">{aa}</span></div>',
                 anchor=(-0.2, -0.6), border='w', fill=(149, 225, 225))
             self.pw.addItem(text)
             text.setPos(x, y)
@@ -887,7 +730,7 @@ class curve_ui(QMainWindow, Ui_Form):
         except Exception as e:
             print(str(e))
 
-
+    # 如果压力和位置采样数据长度不一样，删除多出的数据
     def str_to_int_list(self, x, y):
         x_data = x
         x_data = x_data[1:]
@@ -913,29 +756,6 @@ class curve_ui(QMainWindow, Ui_Form):
             y = y[0:-j]
         return x, y
 
-    # 打开数据库
-    def open_mysql(self):
-        try:
-            # 连接数据库
-            self.db = pymysql.connect(DB_HOST, DB_USER, DB_PASSWORD, DB_NAME)
-            # 打开数据库
-            self.cur = self.db.cursor()
-        except pymysql.Error as e:
-            print("数据库错误def_open_mysql:" + str(e))
-
-    # 数据库查询数据
-    def find_mysql(self, sql):
-        try:
-            self.open_mysql()
-            self.cur.execute(sql)
-            result = self.cur.fetchall()
-            self.cur.close()
-            return result
-        except pymysql.Error as e:
-            # 错误信息
-            print("错误def_select_find:" + str(e))
-
-
 # 修改密码界面
 class change_password(QMainWindow, Ui_Form_PWD):
     def __init__(self):
@@ -948,47 +768,12 @@ class change_password(QMainWindow, Ui_Form_PWD):
         # 禁用最小和最大化按钮
         self.setWindowFlags(Qt.WindowCloseButtonHint)
 
+        self.mysql = mysql()
+        self.mysql.open_mysql()
+
     def init(self):
         self.cancel_btn.clicked.connect(self.close)
         self.submit_btn.clicked.connect(self.submit_change_pwd)
-
-    # 打开数据库
-    def open_mysql(self):
-        try:
-            # 连接数据库
-            self.db = pymysql.connect(DB_HOST, DB_USER, DB_PASSWORD, DB_NAME)
-            # 打开数据库
-            self.cur = self.db.cursor()
-        except pymysql.Error as e:
-            print("数据库错误def_open_mysql:" + str(e))
-
-    # 数据库查询数据
-    def find_mysql(self, sql):
-        try:
-            self.open_mysql()
-            self.cur.execute(sql)
-            result = self.cur.fetchall()
-            self.cur.close()
-            return result
-        except pymysql.Error as e:
-            # 错误信息
-            print("错误def_select_find:" + str(e))
-
-    # 数据库增加数据
-    def add_mysql(self, sql, value):
-        try:
-            self.open_mysql()
-            # 执行SQL语句
-            self.cur.execute(sql, value)
-            # 提交数据
-            self.db.commit()
-            # 关闭表格
-            self.cur.close()
-            # 关闭数据库
-            self.db.close()
-        except pymysql.Error as e:
-            # 错误信息
-            print("错误def_select_find:" + str(e))
 
     def submit_change_pwd(self):
         try:
@@ -997,7 +782,7 @@ class change_password(QMainWindow, Ui_Form_PWD):
             new_pwd = self.new_pwd.text()
             confirm_pwd = self.confirm_pwd.text()
             sql = "SELECT name,password FROM userName WHERE name=" + "'" + user_name + "';"
-            data = self.find_mysql(sql)
+            data = self.mysql.find_mysql(sql)
             name = data[0][0]
             password = data[0][1]
             if original_pwd == '' or new_pwd == '' or confirm_pwd == '':
@@ -1018,7 +803,7 @@ class change_password(QMainWindow, Ui_Form_PWD):
                 # 输入没问题时，更新数据库修改密码
                 sql = 'UPDATE username SET password = %s where name = %s;'
                 value = (new_pwd, name)
-                self.add_mysql(sql, value)
+                self.mysql.add_mysql(sql, value)
                 QMessageBox.about(self, '提示', '密码修改成功，请记住您的新密码')
                 self.original_pwd.clear()
                 self.new_pwd.clear()
