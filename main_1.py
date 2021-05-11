@@ -10,7 +10,7 @@
 import sys
 import time
 
-import PyQt5 #导入PYQT5
+import PyQt5  # 导入PYQT5
 from PyQt5 import QtWidgets
 from PyQt5.QtGui import QColor, QBrush, QFont, QIcon
 from PyQt5.QtNetwork import QLocalSocket, QLocalServer
@@ -18,20 +18,21 @@ from PyQt5.QtWidgets import QMessageBox, QTableWidgetItem, QHeaderView, QInputDi
     QMainWindow
 from PyQt5.QtCore import QTimer, QDateTime, QThread, pyqtSignal, Qt, QDate, QBasicTimer
 
-import pyqtgraph as pg # 导入曲线库
-import serial   # 导入串口
+import pyqtgraph as pg  # 导入曲线库
+import serial  # 导入串口
 import serial.tools.list_ports
 
-from view.pressDataView import Ui_MainWindow # 导入程序主界面
-from view.changePWD import Ui_Form_PWD # 导入更改密码界面
-from view.about import Ui_Form_About # 导入关于界面
-from view.pressCurve import Ui_Form # 导入曲线显示界面
+from view.pressDataView import Ui_MainWindow  # 导入程序主界面
+from view.changePWD import Ui_Form_PWD  # 导入更改密码界面
+from view.about import Ui_Form_About  # 导入关于界面
+from view.pressCurve import Ui_Form  # 导入曲线显示界面
 from kneed import KneeLocator  # 导入拐点算法
-from view.serialPort import Ui_Form_SerialPort  #导入串口设置界面
+from view.serialPort import Ui_Form_SerialPort  # 导入串口设置界面
 
-from database.mysql import mysql # 导入数据库操作
+from database.mysql import mysql  # 导入数据库操作
 
-from view.ui_Splash import Ui_Form_load  #导入程序加载界面
+from view.ui_Splash import Ui_Form_load  # 导入程序加载界面
+
 
 # 数据更新到主界面线程
 class SerialThread(QThread):
@@ -56,6 +57,7 @@ class SerialThread(QThread):
         for port in self.port_list:
             self.Com_Dict[f"{port[0]}"] = f"%{port[1]}"
             self.port.port_select.addItem(port[0])
+
     # 打开串口
     def port_open(self):
         self.ser.port = self.port.port_select.currentText()
@@ -74,16 +76,19 @@ class SerialThread(QThread):
         except:
             # QMessageBox.about(self, "Port Error", "此串口不能被打开！")
             return None
+
     # 关闭串口
     def port_close(self):
         try:
             self.ser.close()
         except:
             pass
+
     # DT78写入1 '%01#WDD00078000780100'  DT472写入0 '%01#WDD00472004720000'
-    def DT78_write(self,command):
+    def DT78_write(self, command):
         data = self.command_Data(command)
         self.data_send(data)
+
     # 将松下指令加上BCC校验位，并转成16进制
     def command_Data(self, Command):
         lit = []
@@ -105,10 +110,11 @@ class SerialThread(QThread):
         Command_hex = Command_hex + '0d'  # 加入松下指令的终止位CR
         # 返回将松下完整指令转成16进制数据
         return Command_hex
+
     # 串口发送数据
     def data_send(self, send_data):
         if self.ser.isOpen():
-            if send_data != "":# 非空字符串
+            if send_data != "":  # 非空字符串
                 # hex发送
                 send_data = send_data.strip()
                 send_list = []
@@ -120,6 +126,7 @@ class SerialThread(QThread):
                 self.ser.write(send_data)
         else:
             pass
+
     # 处理单个数据  flag 质量状态
     def one_data(self, data):
         read_data = data.decode('utf-8')
@@ -136,6 +143,7 @@ class SerialThread(QThread):
         except Exception as e:
             print("错误def_one_data:" + str(e))
         return data
+
     # 处理两个数据  最大压力等
     def two_data(self, data):
         read_data = data.decode('utf-8')
@@ -159,6 +167,7 @@ class SerialThread(QThread):
             except Exception as e:
                 print("错误one_data:" + str(e))
             return data
+
     # 处理多个数据  压力和位置采样
     def many_data(self, data):
         PLC_Data = data.decode('utf-8')
@@ -329,9 +338,11 @@ class SerialThread(QThread):
                 self.press_data_receive()
                 sql = 'SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE to_days(pressdata.timer) = to_days(now()) ;'
                 result = self.mysql.find_mysql(sql)
-                self.update_data.emit(result) # 将查询到的数据发送给槽函数
+                self.update_data.emit(result)  # 将查询到的数据发送给槽函数
             except Exception as e:
                 print("run" + str(e))
+
+
 # 主界面
 class press_Data_App(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -438,7 +449,6 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
             # self.serial_port.serial_Status.setText("扫描完成")
         if len(self.Com_Dict) == 0:
             self.serial_port.serial_Status.setText("无串口")
-        # self.comboBox.clear()
 
     # 更新串口状态
     def port_status(self, bool):
@@ -529,7 +539,7 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
             start_delete_date = self.start_delete_date.text()
             end_delete_date = self.end_delete_date.text()
             warning = QMessageBox.warning(self, '提示',
-                                          '确定要删除%s--%s的数据吗,删除后数据不可恢复' % (start_delete_date, end_delete_date),
+                                          f'确定要删除{start_delete_date}--{end_delete_date}的数据吗,删除后数据不可恢复',
                                           QMessageBox.Yes | QMessageBox.No,
                                           QMessageBox.No)
             if warning == QMessageBox.Yes:
@@ -540,7 +550,7 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
                     password = password[0][0]
                     # 跟数据库数据对比
                     if pwd == password and bb:
-                        sql = "DELETE FROM pressdata WHERE timer >= STR_TO_DATE(" + "'" + start_delete_date + "'," + "'%Y-%m-%d %H:%M:%S') AND timer <= STR_TO_DATE(" + "'" + end_delete_date + "'," + "'%Y-%m-%d %H:%M:%S');"
+                        sql = f"DELETE FROM pressdata WHERE timer >= STR_TO_DATE('{start_delete_date}','%Y-%m-%d %H:%M:%S') AND timer <= STR_TO_DATE('{end_delete_date}','%Y-%m-%d %H:%M:%S');"
                         self.mysql.delete_mysql(sql)
                         QMessageBox.about(self, '提示', '数据已删除')
                     else:
@@ -566,13 +576,8 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
             data = list_data[i]
             for index in range(8):
                 try:
-                    if index == 0:
-                        if i == 0:
-                            newItem = QTableWidgetItem('1')
-                        else:
-                            newItem = QTableWidgetItem(str(i + 1))
-                    else:
-                        newItem = QTableWidgetItem(str(data[index - 1]))
+                    newItem = (QTableWidgetItem('1') if i == 0 else QTableWidgetItem(
+                        str(i + 1))) if index == 0 else QTableWidgetItem(str(data[index - 1]))
                     if str(data[index - 1]) == '合格':
                         newItem.setForeground(QBrush(QColor(11, 166, 120)))  # 合格绿色
                     elif str(data[index - 1]) == '不合格':
@@ -620,31 +625,6 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
                     print('错误show_data_tebleWidget' + e)
 
     #  ****************************曲线******************
-    # 将字符串列表 转换为 数值列表
-    def str_to_int_list(self, x, y):
-        x_data = x
-        x_data = x_data[1:]
-        x_data = x_data[:-1]
-        x_data = x_data.split(', ')
-        y_data = y
-        y_data = y_data[1:]
-        y_data = y_data[:-1]
-        y_data = y_data.split(', ')
-        x = []
-        y = []
-        for i in x_data:
-            data = int(i) / 100
-            x.append(data)
-        for j in y_data:
-            data = int(j) * 10
-            y.append(data)
-        if len(x) > len(y):
-            i = len(x) - len(y)
-            x = x[0:-i]
-        elif len(y) > len(x):
-            j = len(y) - len(x)
-            x = x[0:-j]
-        return x, y
 
     def windowShow(self):
         # 打开子窗口后 阻塞主界面
@@ -652,8 +632,6 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
         self.about_us.setWindowModality(Qt.ApplicationModal)
         self.curve_ui.setWindowModality(Qt.ApplicationModal)
         self.serial_port.setWindowModality(Qt.ApplicationModal)
-        # 全屏开启，无关闭按钮
-        # win_show.showFullScreen()
         # 全屏开启，有关闭按钮
         # win_show.showMaximized()
         win_show.show()  # 显示主界面
@@ -721,7 +699,9 @@ class curve_ui(QMainWindow, Ui_Form):
                     return
                 self.press_coordinates = format(act_pos.y(), '.2f')
                 self.location_coordinates = format(act_pos.x(), '.2f')
-                self.pw.setTitle(f"压装时间: {result[0][2]}       压力: {self.press_coordinates}N  位置: {self.location_coordinates}mm", color='008080', size='12pt')
+                self.pw.setTitle(
+                    f"压装时间: {result[0][2]}       压力: {self.press_coordinates}N  位置: {self.location_coordinates}mm",
+                    color='008080', size='12pt')
 
             curve.scene().sigMouseMoved.connect(mouseover)
 
@@ -753,6 +733,7 @@ class curve_ui(QMainWindow, Ui_Form):
             j = len(y) - len(x)
             y = y[0:-j]
         return x, y
+
 
 # 修改密码界面
 class change_password(QMainWindow, Ui_Form_PWD):
@@ -809,7 +790,7 @@ class change_password(QMainWindow, Ui_Form_PWD):
                 self.close()
 
         except Exception as e:
-            pass
+            print("submit_change_pwd" + str(e))
 
 
 # 串口界面
@@ -833,26 +814,28 @@ class about_us(QMainWindow, Ui_Form_About):
         # 禁用最小和最大化按钮
         self.setWindowFlags(Qt.WindowCloseButtonHint)
 
+
 # 加载窗口
-class Splash(QMainWindow,Ui_Form_load):
+class Splash(QMainWindow, Ui_Form_load):
     # 自定义信号
     splashClose = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)
         # 设置无边框并置顶
-        self.setWindowFlags(Qt.FramelessWindowHint|Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         # 设置背景为透明色
         self.setAttribute(Qt.WA_TranslucentBackground)
         # 计时开始
         self.timeRun()
 
-    #进度条逻辑
+    # 进度条逻辑
     def timeRun(self):
         self.timer = QBasicTimer()
         self.step = 0
         # 设置10超时时间 并开始计时
-        self.timer.start(10,self)
+        self.timer.start(10, self)
 
     def timerEvent(self, evet):
         if self.step >= 100:
