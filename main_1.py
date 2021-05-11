@@ -291,7 +291,6 @@ class SerialThread(QThread):
                 self.data = self.press_data_list
                 # # 读完后 DT78写1
                 self.DT78_write('%01#WDD00078000780100')
-
         # 将数据 写入数据库
         # 0最大压力 1终止压力 2 终止位置 3作业时间 4质量状态 5压力数据采样 6压力数据采样 7位置数据采样 8位置数据采样 9条码 10拐点
         try:
@@ -682,7 +681,7 @@ class curve_ui(QMainWindow, Ui_Form):
             # 清除上次的曲线
             self.pw.clear()
             # 设置图表标题、颜色、字体大小
-            self.pw.setTitle("压装时间: %s" % result[0][2], color='008080', size='12pt')
+            self.pw.setTitle(f"压装时间: {result[0][2]}", color='008080', size='12pt')
             # 背景色改为白色
             self.pw.setBackground('#f0f0f0')
             self.pw.setWindowTitle('压装曲线')
@@ -722,8 +721,7 @@ class curve_ui(QMainWindow, Ui_Form):
                     return
                 self.press_coordinates = format(act_pos.y(), '.2f')
                 self.location_coordinates = format(act_pos.x(), '.2f')
-                self.pw.setTitle("压装时间: %s        压力: %sN  位置: %smm" % (
-                    result[0][2], self.press_coordinates, self.location_coordinates), color='008080', size='12pt')
+                self.pw.setTitle(f"压装时间: {result[0][2]}       压力: {self.press_coordinates}N  位置: {self.location_coordinates}mm", color='008080', size='12pt')
 
             curve.scene().sigMouseMoved.connect(mouseover)
 
@@ -781,7 +779,7 @@ class change_password(QMainWindow, Ui_Form_PWD):
             original_pwd = self.original_pwd.text()
             new_pwd = self.new_pwd.text()
             confirm_pwd = self.confirm_pwd.text()
-            sql = "SELECT name,password FROM userName WHERE name=" + "'" + user_name + "';"
+            sql = f"SELECT name,password FROM userName WHERE name='{user_name}';"
             data = self.mysql.find_mysql(sql)
             name = data[0][0]
             password = data[0][1]
