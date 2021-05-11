@@ -9,28 +9,23 @@
 # ************************************
 import sys
 import time
-
-import PyQt5  # 导入PYQT5
+import PyQt5  # 导入PyQt5
 from PyQt5 import QtWidgets
 from PyQt5.QtGui import QColor, QBrush, QFont, QIcon
 from PyQt5.QtNetwork import QLocalSocket, QLocalServer
 from PyQt5.QtWidgets import QMessageBox, QTableWidgetItem, QHeaderView, QInputDialog, QLineEdit, QApplication, \
     QMainWindow
 from PyQt5.QtCore import QTimer, QDateTime, QThread, pyqtSignal, Qt, QDate, QBasicTimer
-
 import pyqtgraph as pg  # 导入曲线库
 import serial  # 导入串口
 import serial.tools.list_ports
-
 from view.pressDataView import Ui_MainWindow  # 导入程序主界面
 from view.changePWD import Ui_Form_PWD  # 导入更改密码界面
 from view.about import Ui_Form_About  # 导入关于界面
 from view.pressCurve import Ui_Form  # 导入曲线显示界面
 from kneed import KneeLocator  # 导入拐点算法
 from view.serialPort import Ui_Form_SerialPort  # 导入串口设置界面
-
 from database.mysql import mysql  # 导入数据库操作
-
 from view.ui_Splash import Ui_Form_load  # 导入程序加载界面
 
 
@@ -85,7 +80,7 @@ class SerialThread(QThread):
             pass
 
     # DT78写入1 '%01#WDD00078000780100'  DT472写入0 '%01#WDD00472004720000'
-    def DT78_write(self, command):
+    def DT_write(self, command):
         data = self.command_Data(command)
         self.data_send(data)
 
@@ -269,11 +264,12 @@ class SerialThread(QThread):
             x = kneedle.elbow
             # y为压力
             y = kneedle.elbow_y
-            # 将x,y传给DT474 还未写
+            # 将x,y传给DT474 还未写  ******************************
             # 读取完成后
             inflection_point = [x, y]
             self.press_data_list.append(inflection_point)
-            self.DT472_write_0()
+            # DT472写0
+            self.DT_write('%01#WDD00472004720000')
             # 等待DT78 为2 取质量状态
             # 发送指令 读取DT78的值,'%01#RDD0007800078'
             data1 = self.send_falg('%01#RDD0007800078')
@@ -285,7 +281,7 @@ class SerialThread(QThread):
                 self.press_data_list.insert(4, data1)
                 self.data = self.press_data_list
                 # 读完后 DT78写1
-                self.DT78_write('%01#WDD00078000780100')
+                self.DT_write('%01#WDD00078000780100')
         # 当DT472=0时 为出错或报警状态 读取数据
         elif data1 == 0:
             # 发送指令 读取DT78的值,'%01#RDD0007800078'
@@ -299,7 +295,7 @@ class SerialThread(QThread):
                 self.press_data_list = self.press_data_list.append([])
                 self.data = self.press_data_list
                 # # 读完后 DT78写1
-                self.DT78_write('%01#WDD00078000780100')
+                self.DT_write('%01#WDD00078000780100')
         # 将数据 写入数据库
         # 0最大压力 1终止压力 2 终止位置 3作业时间 4质量状态 5压力数据采样 6压力数据采样 7位置数据采样 8位置数据采样 9条码 10拐点
         try:
