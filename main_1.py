@@ -24,7 +24,6 @@ from view.changePWD import Ui_Form_PWD  # 导入更改密码界面
 from view.about import Ui_Form_About  # 导入关于界面
 from view.pressCurve import Ui_Form  # 导入曲线显示界面
 from kneed import KneeLocator  # 导入拐点算法
-from view.serialPort import Ui_Form_SerialPort  # 导入串口设置界面
 from database.mysql import mysql  # 导入数据库操作
 from view.ui_Splash import Ui_Form_load  # 导入程序加载界面
 
