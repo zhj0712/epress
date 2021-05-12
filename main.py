@@ -19,7 +19,7 @@ from PyQt5.QtGui import QColor, QBrush, QFont, QIcon
 from PyQt5.QtNetwork import QLocalSocket, QLocalServer
 from PyQt5.QtWidgets import QMessageBox, QTableWidgetItem, QHeaderView, QInputDialog, QLineEdit, QApplication, \
     QMainWindow
-from PyQt5.QtCore import QTimer, QDateTime, QThread, pyqtSignal, Qt, QDate, QBasicTimer
+from PyQt5.QtCore import QTimer, QDateTime, QThread, pyqtSignal, Qt, QDate, QBasicTimer, QWaitCondition, QMutex
 from view.pressDataView import Ui_MainWindow
 from view.changePWD import Ui_Form_PWD
 from view.about import Ui_Form_About
@@ -50,8 +50,14 @@ class SerialThread(QThread):
         self.ser = serial.Serial()
         self.port_check()
         self.port_open()
+        self._isPause = False
 
-    # 串口扫描
+        self.cond = QWaitCondition()
+        self.mutex = QMutex()
+
+    def print_hello(self):
+        print("hello,world")
+        # 串口扫描
     def port_check(self):
         self.Com_Dict = {}
         self.port_list = list(serial.tools.list_ports.comports())
@@ -305,24 +311,34 @@ class SerialThread(QThread):
         except pymysql.Error as e:
             # 错误信息
             print("错误def_select_find:" + str(e))
-
+    # 暂停和开始线程
+    def stop_start_thread(self,bool):
+        if bool == 1:
+            self._isPause = True
+        elif bool == 0:
+            self._isPause = False
+            self.cond.wakeAll()
     def run(self):
-        while 1:
-            try:
-                if self.ser.isOpen() == True:
-                    self.port_open_status.emit(True)
-                else:
-                    self.port_open_status.emit(False)
-                self.port_select.emit(self.port_list)
-                self.press_data_receive()
-                sql = 'SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE to_days(pressdata.timer) = to_days(now()) ;'
-                result = self.find_mysql(sql)
-                self.update_data.emit(result)
-                # 将查询到的数据发送给槽函数
-                # 3秒更新一次数据
-                # time.sleep(3)
-            except Exception as e:
-                print("错误_run:" + str(e))
+        # if self.flag == True:
+            while 1:
+                try:
+                    self.mutex.lock()
+                    if self._isPause:self.cond.wait(self.mutex)
+                    if self.ser.isOpen() == True:
+                        self.port_open_status.emit(True)
+                    else:
+                        self.port_open_status.emit(False)
+                    self.port_select.emit(self.port_list)
+                    self.press_data_receive()
+                    sql = 'SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE to_days(pressdata.timer) = to_days(now()) ;'
+                    result = self.find_mysql(sql)
+                    self.update_data.emit(result)
+                    # 将查询到的数据发送给槽函数
+                    # 3秒更新一次数据
+                    # time.sleep(3)
+                    self.mutex.unlock()
+                except Exception as e:
+                    print("错误_run:" + str(e))
 
 
 # 主界面
@@ -374,12 +390,18 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
         self.serial_set.triggered.connect(self.port_show)
         # 关于
         self.about_us.triggered.connect(self.about_show)
-        # 开启线程
+        # 线程
         self.backend = SerialThread()
         self.backend.update_data.connect(self.show_data_tebleWidget)
-        self.backend.port_select.connect(self.select_port)
         self.backend.port_open_status.connect(self.port_status)
         self.backend.start()
+        self.stop.clicked.connect(self.stop_thread)
+        self.start.clicked.connect(self.start_thread)
+        self.pushButton.clicked.connect(self.aaa)
+    def stop_thread(self,):
+        self.backend.stop_start_thread(1)
+    def start_thread(self):
+        self.backend.stop_start_thread(0)
     # 主界面 显示曲线
     def main_curve_show(self):
         # 获取点击的列数

@@ -15,7 +15,7 @@ from PyQt5.QtGui import QColor, QBrush, QFont, QIcon
 from PyQt5.QtNetwork import QLocalSocket, QLocalServer
 from PyQt5.QtWidgets import QMessageBox, QTableWidgetItem, QHeaderView, QInputDialog, QLineEdit, QApplication, \
     QMainWindow
-from PyQt5.QtCore import QTimer, QDateTime, QThread, pyqtSignal, Qt, QDate, QBasicTimer
+from PyQt5.QtCore import QTimer, QDateTime, QThread, pyqtSignal, Qt, QDate, QBasicTimer, QWaitCondition, QMutex
 import pyqtgraph as pg  # 导入曲线库
 import serial  # 导入串口
 import serial.tools.list_ports
@@ -32,7 +32,6 @@ from view.ui_Splash import Ui_Form_load  # 导入程序加载界面
 # 数据更新到主界面线程
 class SerialThread(QThread):
     update_data = pyqtSignal(tuple)
-    port_select = pyqtSignal(list)
     port_open_status = pyqtSignal(bool)
 
     def __init__(self, parent=None):
@@ -41,35 +40,23 @@ class SerialThread(QThread):
         self.mysql.open_mysql()
         self.port = serial_port()
         self.ser = serial.Serial()
-        self.port_check()
         self.port_open()
 
-    # 串口扫描
-    def port_check(self):
-        self.Com_Dict = {}
-        self.port_list = list(serial.tools.list_ports.comports())
-        self.port.port_select.clear()
-        for port in self.port_list:
-            self.Com_Dict[f"{port[0]}"] = f"%{port[1]}"
-            self.port.port_select.addItem(port[0])
+        self._isPause = False
+        self.cond = QWaitCondition()
+        self.mutex = QMutex()
 
     # 打开串口
     def port_open(self):
-        self.ser.port = self.port.port_select.currentText()
-        self.ser.baudrate = int(self.port.baud_rate.currentText())
-        self.ser.bytesize = int(self.port.byte_size.currentText())
-        self.ser.stopbits = int(self.port.stop_bits.currentText())
-        # self.ser.timeout = float(self.port.time_out.currentText())
-        if self.port.parity_bit.currentText() == "奇校验":
-            self.ser.parity = "O"
-        elif self.port.parity_bit.currentText() == "偶校验":
-            self.ser.parity = "E"
-        else:
-            self.ser.parity = "N"
+        self.ser.port = 'COM3'
+        self.ser.baudrate = 115200
+        self.ser.bytesize = 8
+        self.ser.stopbits = 1
+        self.ser.parity = "O"  # 奇校验
         try:
             self.ser.open()
         except:
-            # QMessageBox.about(self, "Port Error", "此串口不能被打开！")
+            QMessageBox.about(self, "Port Error", "此串口不能被打开！")
             return None
 
     # 关闭串口
@@ -322,15 +309,22 @@ class SerialThread(QThread):
             # 错误信息
             print("press_data_receive:" + str(e))
 
+    # 暂停和开始线程
+    def stop_start_thread(self, bool):
+        if bool == 1:
+            self._isPause = True
+        elif bool == 0:
+            self._isPause = False
+            self.cond.wakeAll()
     # 线程run
     def run(self):
-        while 1:
+        while self.flag==True:
             try:
-                if self.ser.isOpen() == True:
-                    self.port_open_status.emit(True)
-                else:
-                    self.port_open_status.emit(False)
-                self.port_select.emit(self.port_list)
+                print("111")
+                # if self.ser.isOpen() == True:
+                #     self.port_open_status.emit(True)
+                # else:
+                #     self.port_open_status.emit(False)
                 self.press_data_receive()
                 sql = 'SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE to_days(pressdata.timer) = to_days(now()) ;'
                 result = self.mysql.find_mysql(sql)
@@ -387,13 +381,19 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
         self.serial_set.triggered.connect(self.port_show)
         # 关于
         self.about_us.triggered.connect(self.about_show)
-        # 开启线程
+        # 线程
         self.backend = SerialThread()
         self.backend.update_data.connect(self.show_data_tebleWidget)
-        self.backend.port_select.connect(self.select_port)
         self.backend.port_open_status.connect(self.port_status)
         self.backend.start()
-
+        self.stop.clicked.connect(self.stop_thread)
+        self.start.clicked.connect(self.start_thread)
+    # 暂停线程
+    def stop_thread(self, ):
+        self.backend.stop_start_thread(1)
+    # 开始线程
+    def start_thread(self):
+        self.backend.stop_start_thread(0)
     # 主界面 显示曲线
     def main_curve_show(self):
         # 获取点击的列数
@@ -435,16 +435,6 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
     # 半闭串口
     def port_close(self):
         self.backend.port_close()
-
-    def select_port(self, port_list):
-        self.Com_Dict = {}
-        self.serial_port.port_select.clear()
-        for port in port_list:
-            self.Com_Dict["%s" % port[0]] = "%s" % port[1]
-            self.serial_port.port_select.addItem(port[0])
-            # self.serial_port.serial_Status.setText("扫描完成")
-        if len(self.Com_Dict) == 0:
-            self.serial_port.serial_Status.setText("无串口")
 
     # 更新串口状态
     def port_status(self, bool):
