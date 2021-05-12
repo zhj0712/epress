@@ -17,17 +17,21 @@
    <string/>
   </property>
   <property name="styleSheet">
-   <string notr="true">#query_btn{
-	background-color:#30b89a;
-	border-radius:13px;
-	font:10pt;
-	border:1px solid rgb(179,190,222)
-}
-#query_btn:hover{
-	background-color:#3debc5;
-	border-radius:13px;
-	border:1px solid rgb(179,190,222)
-}
+   <string notr="true">#centralwidget{
+    background-color:#c8ddd1;
+    }
+
+    #query_btn{
+    background-color:#30b89a;
+    border-radius:13px;
+    font:10pt;
+    border:1px solid rgb(179,190,222)
+    }
+    #query_btn:hover{
+    background-color:#3debc5;
+    border-radius:13px;
+    border:1px solid rgb(179,190,222)
+    }
 #query_btn:checked{
 	background-color:#30b89a;
 	border-radius:13px;
@@ -60,7 +64,9 @@
 	border-radius:12px;
 
 }
-</string>
+
+
+   </string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout_3">
@@ -90,6 +96,21 @@
         <property name="autoFillBackground">
          <bool>false</bool>
         </property>
+        <property name="styleSheet">
+         <string notr="true">QListWidget
+          {
+          background-color:#c8ddd1;
+          border:1px solid gray; /*边界线:宽度、颜色*/
+          /*background:gray;*/ /*表格背景色*/
+          color:black; /*前景色：文字颜色*/
+          margin:10px,10px,0px,20px; /*上、下、左、右，间距*/
+          }
+          QListWidget::item{
+          margin-top:20px;
+          padding:20px,20px,10px,10px
+          }
+         </string>
+        </property>
         <property name="lineWidth">
          <number>1</number>
         </property>
@@ -114,7 +135,7 @@
         <property name="gridSize">
          <size>
           <width>0</width>
-          <height>50</height>
+          <height>100</height>
          </size>
         </property>
         <property name="viewMode">
@@ -955,7 +976,6 @@ QPushButton:pressed{
    <addaction name="menu"/>
    <addaction name="menu_2"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
   <action name="admin_pwd">
    <property name="text">
     <string>管理员密码</string>

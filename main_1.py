@@ -31,8 +31,6 @@ from view.ui_Splash import Ui_Form_load  # 导入程序加载界面
 # 数据更新到主界面线程
 class SerialThread(QThread):
     update_data = pyqtSignal(tuple)
-    port_open_status = pyqtSignal(bool)
-
     def __init__(self, parent=None):
         super(SerialThread, self).__init__(parent)
         self.mysql = mysql()
@@ -583,8 +581,6 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
                     self.tableWidget.setItem(i, index, newItem)
                 except Exception as e:
                     print('错误show_data_tebleWidget' + e)
-
-    #  ****************************曲线******************
 
     def windowShow(self):
         # 打开子窗口后 阻塞主界面

@@ -16,17 +16,21 @@ class Ui_MainWindow(object):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1251, 961)
         MainWindow.setAccessibleDescription("")
-        MainWindow.setStyleSheet("#query_btn{\n"
-"    background-color:#30b89a;\n"
-"    border-radius:13px;\n"
-"    font:10pt;\n"
-"    border:1px solid rgb(179,190,222)\n"
-"}\n"
-"#query_btn:hover{\n"
-"    background-color:#3debc5;\n"
-"    border-radius:13px;\n"
-"    border:1px solid rgb(179,190,222)\n"
-"}\n"
+        MainWindow.setStyleSheet("#centralwidget{\n"
+                                 "    background-color:#c8ddd1;\n"
+                                 "}\n"
+                                 "\n"
+                                 "#query_btn{\n"
+                                 "    background-color:#30b89a;\n"
+                                 "    border-radius:13px;\n"
+                                 "    font:10pt;\n"
+                                 "    border:1px solid rgb(179,190,222)\n"
+                                 "}\n"
+                                 "#query_btn:hover{\n"
+                                 "    background-color:#3debc5;\n"
+                                 "    border-radius:13px;\n"
+                                 "    border:1px solid rgb(179,190,222)\n"
+                                 "}\n"
 "#query_btn:checked{\n"
 "    background-color:#30b89a;\n"
 "    border-radius:13px;\n"
@@ -49,17 +53,20 @@ class Ui_MainWindow(object):
 "    border-radius:13px;\n"
 "    border:1px solid rgb(179,190,222)\n"
 "}\n"
-"#delete_data_btn:checked{\n"
-"    background-color:#a66c7d;\n"
-"    border-radius:13px;\n"
-"    border:1px solid rgb(179,190,222)\n"
-"}\n"
-"#delete_data_btn:pressed{\n"
-"    background-color:#d0879d;\n"
-"    border-radius:12px;\n"
-"\n"
-"}\n"
-"")
+                                 "#delete_data_btn:checked{\n"
+                                 "    background-color:#a66c7d;\n"
+                                 "    border-radius:13px;\n"
+                                 "    border:1px solid rgb(179,190,222)\n"
+                                 "}\n"
+                                 "#delete_data_btn:pressed{\n"
+                                 "    background-color:#d0879d;\n"
+                                 "    border-radius:12px;\n"
+                                 "\n"
+                                 "}\n"
+                                 "\n"
+                                 "\n"
+                                 "\n"
+                                 "")
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout(self.centralwidget)
@@ -75,13 +82,25 @@ class Ui_MainWindow(object):
         font.setKerning(True)
         self.listWidget.setFont(font)
         self.listWidget.setAutoFillBackground(False)
+        self.listWidget.setStyleSheet("QListWidget\n"
+                                      "{\n"
+                                      "    background-color:#c8ddd1;\n"
+                                      "    border:1px solid gray;   /*边界线:宽度、颜色*/\n"
+                                      "    /*background:gray;*/    /*表格背景色*/\n"
+                                      "    color:black;        /*前景色：文字颜色*/\n"
+                                      "    margin:10px,10px,0px,20px;   /*上、下、左、右，间距*/\n"
+                                      "}\n"
+                                      "QListWidget::item{\n"
+                                      "    margin-top:20px;\n"
+                                      "    padding:20px,20px,10px,10px\n"
+                                      "}")
         self.listWidget.setLineWidth(1)
         self.listWidget.setMovement(QtWidgets.QListView.Static)
         self.listWidget.setFlow(QtWidgets.QListView.TopToBottom)
         self.listWidget.setProperty("isWrapping", False)
         self.listWidget.setResizeMode(QtWidgets.QListView.Fixed)
         self.listWidget.setLayoutMode(QtWidgets.QListView.SinglePass)
-        self.listWidget.setGridSize(QtCore.QSize(0, 50))
+        self.listWidget.setGridSize(QtCore.QSize(0, 100))
         self.listWidget.setViewMode(QtWidgets.QListView.ListMode)
         self.listWidget.setWordWrap(False)
         self.listWidget.setSelectionRectVisible(False)
@@ -437,9 +456,6 @@ class Ui_MainWindow(object):
         self.menu_2 = QtWidgets.QMenu(self.menubar)
         self.menu_2.setObjectName("menu_2")
         MainWindow.setMenuBar(self.menubar)
-        self.statusbar = QtWidgets.QStatusBar(MainWindow)
-        self.statusbar.setObjectName("statusbar")
-        MainWindow.setStatusBar(self.statusbar)
         self.admin_pwd = QtWidgets.QAction(MainWindow)
         self.admin_pwd.setObjectName("admin_pwd")
         self.serial_set = QtWidgets.QAction(MainWindow)
