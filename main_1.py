@@ -38,7 +38,6 @@ class SerialThread(QThread):
         super(SerialThread, self).__init__(parent)
         self.mysql = mysql()
         self.mysql.open_mysql()
-        self.port = serial_port()
         self.ser = serial.Serial()
         self.port_open()
 
@@ -316,9 +315,10 @@ class SerialThread(QThread):
         elif bool == 0:
             self._isPause = False
             self.cond.wakeAll()
+
     # 线程run
     def run(self):
-        while self.flag==True:
+        while 1:
             try:
                 print("111")
                 # if self.ser.isOpen() == True:
@@ -342,8 +342,6 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
         self.init()
         # 实例化密码修改窗口
         self.change_password = change_password()
-        # 实例串口窗口
-        self.serial_port = serial_port()
         # 实例关于窗口
         self.about_us = about_us()
         # 实例化曲线窗口
@@ -378,22 +376,27 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
         # ****************菜单栏****************
         # 管理员密码
         self.admin_pwd.triggered.connect(self.change_pwd_show)
-        self.serial_set.triggered.connect(self.port_show)
         # 关于
         self.about_us.triggered.connect(self.about_show)
         # 线程
         self.backend = SerialThread()
         self.backend.update_data.connect(self.show_data_tebleWidget)
-        self.backend.port_open_status.connect(self.port_status)
         self.backend.start()
         self.stop.clicked.connect(self.stop_thread)
         self.start.clicked.connect(self.start_thread)
+
     # 暂停线程
     def stop_thread(self, ):
         self.backend.stop_start_thread(1)
+        self.start.setEnabled(True)
+        self.stop.setEnabled(False)
+
     # 开始线程
     def start_thread(self):
         self.backend.stop_start_thread(0)
+        self.stop.setEnabled(True)
+        self.start.setEnabled(False)
+
     # 主界面 显示曲线
     def main_curve_show(self):
         # 获取点击的列数
@@ -421,32 +424,6 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
     # 显示修改密码窗口
     def change_pwd_show(self):
         self.change_password.show()
-
-    # 显示串口窗口
-    def port_show(self):
-        self.serial_port.show()
-        self.serial_port.serial_open_btn.clicked.connect(self.port_open)
-        self.serial_port.serial_exit_btn.clicked.connect(self.port_close)
-
-    # 打开串口
-    def port_open(self):
-        self.backend.port_open()
-
-    # 半闭串口
-    def port_close(self):
-        self.backend.port_close()
-
-    # 更新串口状态
-    def port_status(self, bool):
-        if bool == True:
-            self.serial_port.serial_open_btn.setEnabled(False)
-            self.serial_port.serial_exit_btn.setEnabled(True)
-            self.serial_port.serial_Status.setText("串口打开")
-            self.serial_port.serial_open_btn.isVisible()
-        else:
-            self.serial_port.serial_open_btn.setEnabled(True)
-            self.serial_port.serial_exit_btn.setEnabled(False)
-            self.serial_port.serial_Status.setText("串口关闭")
 
     # 显示关于窗口
     def about_show(self):
@@ -617,7 +594,6 @@ class press_Data_App(QMainWindow, Ui_MainWindow):
         self.change_password.setWindowModality(Qt.ApplicationModal)
         self.about_us.setWindowModality(Qt.ApplicationModal)
         self.curve_ui.setWindowModality(Qt.ApplicationModal)
-        self.serial_port.setWindowModality(Qt.ApplicationModal)
         # 全屏开启，有关闭按钮
         # win_show.showMaximized()
         win_show.show()  # 显示主界面
@@ -777,17 +753,6 @@ class change_password(QMainWindow, Ui_Form_PWD):
 
         except Exception as e:
             print("submit_change_pwd" + str(e))
-
-
-# 串口界面
-class serial_port(QMainWindow, Ui_Form_SerialPort):
-    def __init__(self):
-        super(serial_port, self).__init__()
-        self.setupUi(self)
-        # 禁用窗口最大化 和拉伸
-        self.setFixedSize(self.width(), self.height())
-        # 禁用最小和最大化按钮
-        self.setWindowFlags(Qt.WindowCloseButtonHint)
 
 
 # 关于界面
