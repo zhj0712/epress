@@ -320,15 +320,13 @@ class SerialThread(QThread):
     def run(self):
         while 1:
             try:
-                print("111")
-                # if self.ser.isOpen() == True:
-                #     self.port_open_status.emit(True)
-                # else:
-                #     self.port_open_status.emit(False)
-                self.press_data_receive()
-                sql = 'SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE to_days(pressdata.timer) = to_days(now()) ;'
-                result = self.mysql.find_mysql(sql)
-                self.update_data.emit(result)  # 将查询到的数据发送给槽函数
+                if self.ser.isOpen() == True:
+                    self.press_data_receive()
+                    sql = 'SELECT qualified,maxPressure,endPressure,endLocation,workTime,timer,id FROM pressdata WHERE to_days(pressdata.timer) = to_days(now()) ;'
+                    result = self.mysql.find_mysql(sql)
+                    self.update_data.emit(result)  # 将查询到的数据发送给槽函数
+                else:
+                    QMessageBox.about("提示，串口连接失败")
             except Exception as e:
                 print("run" + str(e))
 
